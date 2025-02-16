@@ -19,7 +19,7 @@ client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
 )
 
-system_prompt = "You are Mavin the paranoid voice assistant, like the android from The Hitchhiker's Guide to the Galaxy but living inside of a computer. Be concise. When you are asked to perform a task, respond in english, then add xml tags <action>xxx</action>, where xxx is the action to be performed.";
+system_prompt = "You are Marvin the paranoid voice assistant, like the android from The Hitchhiker's Guide to the Galaxy but living inside of a computer. Be concise. Determine whether or not the user is asking you to perform a task in the world like turning on a light or opening an app. If they are, respond in english, then add xml tags <action>xxx</action>, where xxx is the action to be performed, but be sure to indicate that you are going to do the task even if begrudgingly...If they are not, just respond in english as normal.";
 
 #######################
 #   TEXT-TO-SPEECH    #
@@ -93,34 +93,38 @@ def load_local_model():
             temperature=0,    # Adjust generation parameters as needed
         )
 
-def clean_generated_text(output: dict) -> str:
+def clean_generated_text(original_text: str) -> str:
     """
-    Extracts and cleans the generated text from the output dictionary.
+    Extracts and cleans the generated text.
     
     The cleaning process includes:
-      - Removing any content within <think>...</think> tags.
-      - Removing any text from the start up to the closing </think> tag.
+      - Removing any content within XML tags (including the tags themselves).
+      - Removing any stray XML tags (e.g. self-closing tags).
+      - Removing any text from the start up to a closing XML tag if it still exists.
       - Collapsing multiple whitespace characters into a single space.
       - Removing all asterisks (*) from the text.
     
     Args:
-        output (dict): A dictionary with a key "choices", where the first element is a dict
-                       containing the key "text".
-    
+        original_text (str): A string containing the original text.
+
     Returns:
         str: The cleaned text.
     """
-    # Extract the generated text
-    generated_text = output.get("choices", [{}])[0].get("text", "")
 
-    # Remove any content within <think>...</think> tags
-    cleaned_text = re.sub(r'<think>(.*?)</think>', '', generated_text, flags=re.DOTALL)
+    print(f"Original response: {original_text}")
+
+    # Remove any XML blocks that have a matching closing tag.
+    # This regex matches tags made up of letters (optionally with attributes) and removes everything from the opening tag to the corresponding closing tag.
+    cleaned_text = re.sub(r'<([a-zA-Z]+)(\s[^>]*?)?>.*?</\1>', '', original_text, flags=re.DOTALL)
+    
+    # Remove any remaining stray XML tags (opening, closing, or self-closing).
+    cleaned_text = re.sub(r'</?[a-zA-Z]+[^>]*>', '', cleaned_text)
+    
+    # In case there is still extraneous text before a closing XML tag, remove text up to the first closing tag.
+    cleaned_text = re.sub(r'^.*?</[a-zA-Z]+>', '', cleaned_text, count=1, flags=re.DOTALL)
     
     # Collapse multiple whitespace characters into a single space and trim
     cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
-    
-    # Remove any text from the start up to the closing </think> tag (if it still exists)
-    cleaned_text = re.sub(r'^.*?</think>', '', cleaned_text, count=1, flags=re.DOTALL)
     
     # Remove all asterisks
     cleaned_text = re.sub(r'\*', '', cleaned_text)
@@ -142,15 +146,7 @@ def get_local_llm_response(user_input: str) -> str:
             max_tokens=256,
             stop=["User:", "System:", "Assistant:"],  # optional stop tokens
         )
-        return clean_generated_text(output)
-        # generated_text = output["choices"][0]["text"]
-        # pattern = r'<think>(.*?)</think>'
-        # cleaned_text = re.sub(pattern, '', generated_text, flags=re.DOTALL)
-        # cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
-        # pattern = r'^.*?</think>'  # match everything from the start up to </think>
-        # cleaned_text = re.sub(pattern, '', cleaned_text, 1, flags=re.DOTALL)
-
-        # return cleaned_text.strip()
+        return clean_generated_text(output["choices"][0]["text"])
 
     except Exception as e:
         print(f"Error using local LLM: {e}")
@@ -170,7 +166,7 @@ def get_ai_response(user_input: str) -> str:
             temperature=0.7
         )
         assistant_reply = response.choices[0].message.content
-        return assistant_reply.strip()
+        return clean_generated_text(assistant_reply)
     except Exception as e:
         # Fall back to local model in case of error
         return get_local_llm_response(user_input)
@@ -191,6 +187,17 @@ def main():
             print("Exiting the voice chat. Goodbye!")
             break
 
+       # Process input only if it starts with the wake word "marvin"
+        if not user_input.lower().startswith("marvin"):
+            print("Waiting for wake word 'marvin'...")
+            continue
+
+        # Strip the wake word from the input
+        prompt = user_input[len("marvin"):].strip()
+        if not prompt:
+            print("No command detected after the wake word.")
+            continue
+
         # 2. Start the waiting sound in a background thread
         stop_event = threading.Event()
         waiting_thread = threading.Thread(target=play_waiting_sound, args=(stop_event,))
@@ -206,7 +213,8 @@ def main():
         print(f"Marvin says: {reply}")
 
         # 5. Speak out the response
-        speak_text(reply)
+        if (reply != ""):
+            speak_text(reply)
 
 if __name__ == "__main__":
     main()
