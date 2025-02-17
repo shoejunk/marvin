@@ -1,3 +1,4 @@
 *.env
 __pycache__
 conversation_history.json
+/temp_tts.mp3
