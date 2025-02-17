@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-llm.py - Handles local and API-based language model responses.
+llm.py - Handles API-based language model responses.
 This module preserves <action> tags in the response for downstream processing.
 """
 
@@ -8,8 +8,8 @@ import os
 import re
 from openai import OpenAI
 from dotenv import load_dotenv
-from llama_cpp import Llama
 from config import action_strings  # Import shared valid actions list
+from conversation_history import load_history
 
 # Load environment variables from a .env file (if present)
 load_dotenv()
@@ -28,21 +28,6 @@ system_prompt = (
     "If they are not, just respond in English as normal."
 )
 
-# Path to the local LLM model
-model_path = "C:\\Users\\jshun\\AppData\\Local\\nomic.ai\\GPT4All\\DeepSeek-R1-Distill-Qwen-14B-Q4_0.gguf"
-local_llm = None
-
-def load_local_model():
-    """Loads the local language model if it hasn't been loaded already."""
-    global local_llm
-    if local_llm is None:
-        local_llm = Llama(
-            model_path=model_path,
-            n_ctx=2048,
-            n_threads=6,
-            temperature=0,
-        )
-
 def clean_generated_text(original_text: str) -> str:
     """
     Cleans the generated text from the language model.
@@ -55,40 +40,26 @@ def clean_generated_text(original_text: str) -> str:
     cleaned_text = re.sub(r'\*', '', cleaned_text)
     return cleaned_text.strip()
 
-def get_local_llm_response(user_input: str) -> str:
-    """
-    Gets a response from the local language model.
-    Loads the model if necessary and cleans the output.
-    """
-    try:
-        if local_llm is None:
-            load_local_model()
-        output = local_llm(
-            prompt=user_input,
-            max_tokens=256,
-            stop=["User:", "System:", "Assistant:"],
-        )
-        return clean_generated_text(output["choices"][0]["text"])
-    except Exception as e:
-        print(f"Error using local LLM: {e}")
-        return "I'm sorry, I'm having an issue with the local LLM."
-
 def get_ai_response(user_input: str) -> str:
     """
     Gets a response from the OpenAI API.
-    Falls back to the local language model in case of errors.
     """
+    history = load_history()
+    messages = [{"role": "system", "content": system_prompt}]
+    # Append each previous conversation turn.
+    for turn in history:
+        messages.append({"role": "user", "content": turn["user"]})
+        messages.append({"role": "assistant", "content": turn["assistant"]})
+    # Append the current prompt.
+    messages.append({"role": "user", "content": user_input})
     try:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_input},
-            ],
+            messages=messages,
             temperature=0.7
         )
         assistant_reply = response.choices[0].message.content
         return clean_generated_text(assistant_reply)
     except Exception as e:
         print(f"Error using OpenAI API: {e}")
-        return "I'm sorry, I'm having an issue with the OpenAI API."
+        return "I'm sorry. My systems are offline."

@@ -10,16 +10,15 @@ import re
 import threading
 from speech import transcribe_speech_to_text
 from tts import speak_text
-from llm import get_ai_response, load_local_model
+from llm import get_ai_response
 from waiting_sound import play_waiting_sound
 from meross_control import MerossController
 from config import action_strings  # Import shared valid actions list
+from conversation_history import update_history
 
 async def async_main():
     print("Initializing Meross Controller...")
     meross_controller = await MerossController.init()
-    
-    print("Say 'quit' or 'exit' to stop.")
     
     while True:
         # Get user input from speech transcription.
@@ -27,13 +26,9 @@ async def async_main():
         if not user_input:
             continue
 
-        if user_input.lower() in ["quit", "exit", "stop"]:
-            print("Exiting the voice chat. Goodbye!")
-            await meross_controller.shutdown()
-            break
-
         # Process commands only if a valid wake word ("marvin", "hey marvin", or "ok marvin") is detected.
         wake_words = ["marvin", "hey marvin", "ok marvin", "okay marvin", "hi marvin"]
+        wake_words += ["martin", "hey martin", "ok martin", "okay martin", "hi martin"]
         user_input_lower = user_input.lower()
         matched_wake_word = None
         for wake_word in wake_words:
@@ -57,6 +52,9 @@ async def async_main():
         reply = await asyncio.to_thread(get_ai_response, user_input)
         stop_event.set()
         waiting_thread.join()
+
+        # Update conversation history with the current turn.
+        update_history(user_input, reply)
 
         # Remove any <action> tags from the text before speaking.
         text_to_speak = re.sub(r'<action>.*?</action>', '', reply, flags=re.IGNORECASE)
