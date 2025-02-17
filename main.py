@@ -13,19 +13,16 @@ from tts import speak_text
 from llm import get_ai_response, load_local_model
 from waiting_sound import play_waiting_sound
 from meross_control import MerossController
-
-# Define valid action strings (all lowercase, with underscores)
-action_strings = ['turn_on_light', 'turn_off_light']
+from config import action_strings  # Import shared valid actions list
 
 async def async_main():
-    # load_local_model()
     print("Initializing Meross Controller...")
     meross_controller = await MerossController.init()
     
     print("Say 'quit' or 'exit' to stop.")
     
     while True:
-        # Call the blocking transcribe function in a thread
+        # Get user input from speech transcription.
         user_input = await asyncio.to_thread(transcribe_speech_to_text)
         if not user_input:
             continue
@@ -35,13 +32,21 @@ async def async_main():
             await meross_controller.shutdown()
             break
 
-        # Process commands only if the wake word "marvin" is detected.
-        if not user_input.lower().startswith("marvin"):
+        # Process commands only if a valid wake word ("marvin", "hey marvin", or "ok marvin") is detected.
+        wake_words = ["marvin", "hey marvin", "ok marvin", "okay marvin", "hi marvin"]
+        user_input_lower = user_input.lower()
+        matched_wake_word = None
+        for wake_word in wake_words:
+            if user_input_lower.startswith(wake_word):
+                matched_wake_word = wake_word
+                break
+
+        if not matched_wake_word:
             print("Waiting for wake word 'marvin'...")
             continue
 
-        # Remove the wake word.
-        command = user_input[len("marvin"):].strip()
+        # Remove the detected wake word from the beginning of the input.
+        command = user_input[len(matched_wake_word):].strip()
 
         # Start waiting sound in a separate thread.
         stop_event = threading.Event()
@@ -52,7 +57,6 @@ async def async_main():
         reply = await asyncio.to_thread(get_ai_response, user_input)
         stop_event.set()
         waiting_thread.join()
-
 
         # Remove any <action> tags from the text before speaking.
         text_to_speak = re.sub(r'<action>.*?</action>', '', reply, flags=re.IGNORECASE)

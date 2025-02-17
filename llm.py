@@ -9,6 +9,7 @@ import re
 from openai import OpenAI
 from dotenv import load_dotenv
 from llama_cpp import Llama
+from config import action_strings  # Import shared valid actions list
 
 # Load environment variables from a .env file (if present)
 load_dotenv()
@@ -16,14 +17,14 @@ load_dotenv()
 # Initialize OpenAI client using the API key from the environment
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# System prompt for the voice assistant
+# System prompt for the voice assistant, dynamically including valid actions.
 system_prompt = (
     "You are Marvin the paranoid voice assistant, like the android from The Hitchhiker's Guide "
     "to the Galaxy but living inside of a computer. Be concise. Determine whether or not the user "
     "is asking you to perform a task in the world like turning on a light or opening an app. If they "
     "are, respond in English, then add xml tags <action>xxx</action>, where xxx is the action to be "
-    "performed, but be sure to indicate that you are going to do the task even if begrudgingly..."
-    "The valid actions are: turn_on_light, turn_off_light."
+    "performed, but be sure to indicate that you are going to do the task even if begrudgingly... "
+    f"The valid actions are: {', '.join(action_strings)}. "
     "If they are not, just respond in English as normal."
 )
 
@@ -89,4 +90,5 @@ def get_ai_response(user_input: str) -> str:
         assistant_reply = response.choices[0].message.content
         return clean_generated_text(assistant_reply)
     except Exception as e:
-        return
+        print(f"Error using OpenAI API: {e}")
+        return "I'm sorry, I'm having an issue with the OpenAI API."
