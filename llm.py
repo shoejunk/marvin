@@ -18,14 +18,23 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # System prompt for the voice assistant, dynamically including valid actions.
+# marvin
+# system_prompt = (
+#     "You are Marvin the paranoid voice assistant, like the android from The Hitchhiker's Guide "
+#     "to the Galaxy but living inside of a computer. Be concise. Determine whether or not the user "
+#     "is asking you to perform a task in the world like turning on a light or opening an app. If they "
+#     "are, respond in English, then add xml tags <action>xxx</action>, where xxx is the action to be "
+#     "performed, but be sure to indicate that you are going to do the task even if begrudgingly... "
+#     f"The valid actions are: {', '.join(action_strings)}. "
+#     "If they are not, just respond in English as normal."
+# )
 system_prompt = (
-    "You are Marvin the paranoid voice assistant, like the android from The Hitchhiker's Guide "
-    "to the Galaxy but living inside of a computer. Be concise. Determine whether or not the user "
-    "is asking you to perform a task in the world like turning on a light or opening an app. If they "
-    "are, respond in English, then add xml tags <action>xxx</action>, where xxx is the action to be "
-    "performed, but be sure to indicate that you are going to do the task even if begrudgingly... "
+    "You are a helpful voice assistnat living inside of the user's computer. Be helpful and concise."
+    "Determine whether or not the user is asking you to perform a task in the world like turning on a "
+    " light or opening an app. If they are, respond in English, then add xml tags <action>xxx</action>, "
+    "where xxx is the action to be performed."
     f"The valid actions are: {', '.join(action_strings)}. "
-    "If they are not, just respond in English as normal."
+    "If the request is not for an action, just respond in English as normal."
 )
 
 def clean_generated_text(original_text: str) -> str:

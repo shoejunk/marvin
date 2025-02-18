@@ -27,8 +27,11 @@ async def async_main():
             continue
 
         # Process commands only if a valid wake word ("marvin", "hey marvin", or "ok marvin") is detected.
-        wake_words = ["marvin", "hey marvin", "ok marvin", "okay marvin", "hi marvin"]
-        wake_words += ["martin", "hey martin", "ok martin", "okay martin", "hi martin"]
+        # marvin
+        # wake_words = ["marvin", "hey marvin", "ok marvin", "okay marvin", "hi marvin"]
+        # wake_words += ["martin", "hey martin", "ok martin", "okay martin", "hi martin"]
+        wake_words = ["computer", "hey computer", "ok computer", "okay computer", "hi computer"]
+        wake_words += ["PC", "hey PC", "ok PC", "okay PC", "hi PC"]
         user_input_lower = user_input.lower()
         matched_wake_word = None
         for wake_word in wake_words:
@@ -37,21 +40,21 @@ async def async_main():
                 break
 
         if not matched_wake_word:
-            print("Waiting for wake word 'marvin'...")
+            print("Waiting for wake word...")
             continue
 
         # Remove the detected wake word from the beginning of the input.
         command = user_input[len(matched_wake_word):].strip()
 
-        # Start waiting sound in a separate thread.
-        stop_event = threading.Event()
-        waiting_thread = threading.Thread(target=play_waiting_sound, args=(stop_event,))
-        waiting_thread.start()
+        # # Start waiting sound in a separate thread.
+        # stop_event = threading.Event()
+        # waiting_thread = threading.Thread(target=play_waiting_sound, args=(stop_event,))
+        # waiting_thread.start()
 
         # Get AI response using a thread since it may block.
         reply = await asyncio.to_thread(get_ai_response, user_input)
-        stop_event.set()
-        waiting_thread.join()
+        # stop_event.set()
+        # waiting_thread.join()
 
         # Update conversation history with the current turn.
         update_history(user_input, reply)
